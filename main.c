@@ -145,51 +145,148 @@ void print_krug ()
 
 }
 
-int main(void)
+void print_grid ()
 {
-   for (int i = 0; i < y_max; i++)
-       for (int j = 0; j < x_max; j++)
-           arr[i][j] = '\0';
-
-    rcc_config();
-    gpio_config();
-    oled_config();
-    printf_config();
-
-    
     for (uint8_t i = 3; i < 59; i++)
         for (uint8_t j = 35; j < 91; j++)
             {
                 if ((((i - 3) % 18) == 0) || (((i - 4) % 18) == 0 ))
-		    oled_set_pix (j, i, clWhite);
-		if ((((j - 35) % 18) == 0) || (((j - 36) % 18) == 0 ))
-		    oled_set_pix (j, i, clWhite);
+                    oled_set_pix (j, i, clWhite);
+                if ((((j - 35) % 18) == 0) || (((j - 36) % 18) == 0 ))
+                    oled_set_pix (j, i, clWhite);
             }
-	
-     
-    /*while (1) 
+}
+
+void make_zero ()
+{
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+            arr[i][j] = '\0';
+}
+
+void find_empty ()
+{
+    for (y = 0; y < 3; y++)
+        for (x = 0; x < 3; x++)
+            if (arr[y][x] == '\0')
+		return;
+}
+
+void draw ()
+{
+    oled_clr (clBlack);
+    print_grid ();
+
+    for (y = 0; y < 3; y++)
+        for (x = 0; x < 3; x++)
+        {
+            if (arr[y][x] == 'x')
+                print_krest ();
+            else if (arr[y][x] == 'o')
+                print_krug ();
+        }
+
+    oled_update ();
+}
+
+void move_cursor_x (uint8_t dir)
+{
+    while (1)
     {
+	x = (x + dir) % 3;
+
+        if (arr[y][x] == '\0')
+	{
+            print_krug ();
+	    print_krest ();
+	    return;
+	}
+    }
+}
+
+void print_win (char winner)
+{
+    oled_clr (clBlack);
+    oled_set_cursor (0, 0);
+    xprintf ("Player %c had won the game\n", winner);
+}
+
+int check_win ()
+{
+    uint8_t j = 0;
+    uint8_t i = 0;
+
+    for (i = 0; i < 3; i++)
+    {
+        if (arr[i][j] == arr[i][j + 1] && arr[i][j] == arr[i][j + 2])
+	{
+            print_win (arr[i][j]);
+	    return 1;
+	}
+    }
+
+    i = 0;
+    for (j = 0; j < 3; j++)
+    {
+        if (arr[i][j] == arr[i + 1][j] && arr[i][j] == arr[i + 2][j])
+	{
+            print_win (arr[i][j]);
+	    return 1;
+	}
+    }
+
+    if (arr[0][0] == arr[1][1] && arr[0][0] == arr[2][2])
+    {
+        print_win (arr[0][0]);
+	return 1;
+    }
+
+    if (arr[0][2] == arr[1][1] && arr[1][1] == arr[2][0])
+    {
+        print_win (arr[1][1]);
+	return 1;
+    }
+
+    return 0;
+}
+
+int main(void)
+{
+    rcc_config();
+    gpio_config();
+    oled_config();
+    timers_config();
+    printf_config();
+
+    make_zero ();
+
+    arr[0][0] = 'x';
+
+    int check = 0;
+
+    while (1) 
+    {
+        check = check_win ();
+
+	if (check == 0)    
+	    draw ();
+
+	if (check == 0)
+            find_empty ();
+
         if (LL_TIM_GetCounterMode(TIM2) == LL_TIM_COUNTERMODE_UP) {
             LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_8);
             LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_9);
+	    move_cursor_x (1);
+	    check = 1;
         }
-        if (LL_TIM_GetCounterMode(TIM2) == LL_TIM_COUNTERMODE_DOWN) {
+	else if (LL_TIM_GetCounterMode(TIM2) == LL_TIM_COUNTERMODE_DOWN) {
             LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_9);
             LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_8);
+	    move_cursor_x (-1);
+	    check = 1;
         }
-        
-        oled_clr(clBlack);
-        oled_set_cursor(0,0);
-        //oled_update();
-        xprintf("%d", LL_TIM_GetCounterMode(TIM2));
-        oled_update();
-    } */
-        
+    }
 
-    print_krug ();
-    print_krest ();
-    oled_update();
-
-    while (1);
     return 0;
 }
