@@ -157,11 +157,11 @@ void print_grid ()
             }
 }
 
-void make_zero ()
+void fill_arr ()
 {
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
-            arr[i][j] = '\0';
+            arr[i][j] = i + j;
 }
 
 void find_empty ()
@@ -221,7 +221,7 @@ int check_win ()
         if (arr[i][j] == arr[i][j + 1] && arr[i][j] == arr[i][j + 2])
 	{
             print_win (arr[i][j]);
-	    return 1;
+	    return 0;
 	}
     }
 
@@ -231,23 +231,23 @@ int check_win ()
         if (arr[i][j] == arr[i + 1][j] && arr[i][j] == arr[i + 2][j])
 	{
             print_win (arr[i][j]);
-	    return 1;
+	    return 0;
 	}
     }
 
     if (arr[0][0] == arr[1][1] && arr[0][0] == arr[2][2])
     {
         print_win (arr[0][0]);
-	return 1;
+	return 0;
     }
 
     if (arr[0][2] == arr[1][1] && arr[1][1] == arr[2][0])
     {
         print_win (arr[1][1]);
-	return 1;
+	return 0;
     }
 
-    return 0;
+    return 1;
 }
 
 int main(void)
@@ -258,7 +258,7 @@ int main(void)
     timers_config();
     printf_config();
 
-    make_zero ();
+    fill_arr ();
 
     arr[0][0] = 'x';
 
