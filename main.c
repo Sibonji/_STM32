@@ -161,7 +161,7 @@ void fill_arr ()
 {
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
-            arr[i][j] = i + j;
+            arr[i][j] = '\0';
 }
 
 void find_empty ()
@@ -208,46 +208,53 @@ void print_win (char winner)
 {
     oled_clr (clBlack);
     oled_set_cursor (0, 0);
-    xprintf ("Player %c had won the game\n", winner);
+    xprintf ("     Player %c won\n", winner);
+    xprintf ("       the game!\n");
+    xprintf ("     If you want to\n");
+    xprintf ("    play again press\n");
+    xprintf ("         Reset.\n");
+    oled_update ();
 }
 
-int check_win ()
+char check_win ()
 {
     uint8_t j = 0;
     uint8_t i = 0;
 
+    char symb = '\0';
+
     for (i = 0; i < 3; i++)
     {
-        if (arr[i][j] == arr[i][j + 1] && arr[i][j] == arr[i][j + 2])
+        if ((symb = arr[i][j]) == arr[i][j + 1] && arr[i][j] == arr[i][j + 2] && (symb == 'x' || symb == 'o'))
 	{
             print_win (arr[i][j]);
-	    return 0;
+	    return symb;
 	}
     }
 
     i = 0;
     for (j = 0; j < 3; j++)
     {
-        if (arr[i][j] == arr[i + 1][j] && arr[i][j] == arr[i + 2][j])
+        if ((symb = arr[i][j]) == arr[i + 1][j] && arr[i][j] == arr[i + 2][j] && (symb == 'x' || symb == 'o'))
 	{
             print_win (arr[i][j]);
-	    return 0;
+	    return symb;
 	}
     }
 
-    if (arr[0][0] == arr[1][1] && arr[0][0] == arr[2][2])
+    if ((symb = arr[0][0]) == arr[1][1] && arr[0][0] == arr[2][2] && (symb == 'x' || symb == 'o'))
     {
         print_win (arr[0][0]);
-	return 0;
+	return symb;
     }
 
-    if (arr[0][2] == arr[1][1] && arr[1][1] == arr[2][0])
+    if ((symb = arr[0][2]) == arr[1][1] && arr[1][1] == arr[2][0] && (symb == 'x' || symb == 'o'))
     {
         print_win (arr[1][1]);
-	return 0;
+	return symb;
     }
 
-    return 1;
+    return '\0';
 }
 
 int main(void)
@@ -260,14 +267,11 @@ int main(void)
 
     fill_arr ();
 
-    arr[0][0] = 'x';
-
     int check = 0;
+    char check_end = 0;
 
     while (1) 
     {
-        check = check_win ();
-
 	if (check == 0)    
 	    draw ();
 
@@ -286,6 +290,16 @@ int main(void)
 	    move_cursor_x (-1);
 	    check = 1;
         }
+
+	check_end = check_win ();
+
+	if (check_end != '\0')
+	    break;
+    }
+
+    while (1)
+    {
+        print_win (check_end);
     }
 
     return 0;
