@@ -51,8 +51,9 @@ static void timers_config(void)
     LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_5, LL_GPIO_AF_2);
     LL_GPIO_SetPinPull(GPIOA, LL_GPIO_PIN_1, LL_GPIO_PULL_UP);
     LL_GPIO_SetPinPull(GPIOA, LL_GPIO_PIN_5, LL_GPIO_PULL_UP);
-
+    
     LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM2);
+
     /* (1) Configure TI1FP1 on TI1 (CC1S = 01)
          configure TI1FP2 on TI2 (CC2S = 01) */
     /* (2) Configure TI1FP1 and TI2FP2 non inverted (CC1P = CC2P = 0, reset value) */
@@ -83,6 +84,8 @@ char arr[y_max][x_max] = {'\0'};
 uint8_t x = 0;
 uint8_t y = 0;
 
+int player_turn = 0;
+
 uint8_t sum_x (uint8_t j)
 {
     return ((x + 1) * 2 + x * 16 + 34 + j);
@@ -94,38 +97,38 @@ uint8_t sum_y (uint8_t i)
 }
 
 
-void print_krest ()
+void print_krest (enum color_t color)
 {
     for (uint8_t i = 2; i < 16; i++)
         for (uint8_t j = 2; j < 16; j++)
 	    {
 	        if ( i == j || i == 17 - j)
 		    {
-			oled_set_pix (sum_x (j), sum_y (i), clWhite);
+			oled_set_pix (sum_x (j), sum_y (i), color);
 		    }
 	    }
 }
 
-void print_krug ()
+void print_krug (enum color_t color)
 {
     for (uint8_t i = 2; i < 16; i++)
     {
 	if (i == 2 || 17 - i == 2)
 	    for (uint8_t j = 7; j < 11; j++)
-		oled_set_pix (sum_x (j), sum_y (i), clWhite);
+		oled_set_pix (sum_x (j), sum_y (i), color);
 	if (i == 3 || 17 - i == 3)
 	{
 	    for (uint8_t j = 5; j < 7; j++)
-		oled_set_pix (sum_x (j), sum_y (i), clWhite);
+		oled_set_pix (sum_x (j), sum_y (i), color);
 	    for (uint8_t j = 11; j < 13; j++)
-                oled_set_pix (sum_x (j), sum_y (i), clWhite);
+                oled_set_pix (sum_x (j), sum_y (i), color);
         }
 	if (i == 4 || 17 - i == 4)
 	{
 	    uint8_t j = i;
-                oled_set_pix (sum_x (j), sum_y (i), clWhite);
+                oled_set_pix (sum_x (j), sum_y (i), color);
 	    j = 17 - i;
-	        oled_set_pix (sum_x (j), sum_y (i), clWhite);
+	        oled_set_pix (sum_x (j), sum_y (i), color);
 	}
     }
 
@@ -133,13 +136,13 @@ void print_krug ()
     {
         if (j == 2 || 17 - j == 2)
             for (uint8_t i = 7; i < 11; i++)
-                oled_set_pix (sum_x (j), sum_y (i), clWhite);
+                oled_set_pix (sum_x (j), sum_y (i), color);
         if (j == 3 || 17 - j == 3)
         {
             for (uint8_t i = 5; i < 7; i++)
-                oled_set_pix (sum_x (j), sum_y (i), clWhite);
+                oled_set_pix (sum_x (j), sum_y (i), color);
             for (uint8_t i = 11; i < 13; i++)
-                oled_set_pix (sum_x (j), sum_y (i), clWhite);
+                oled_set_pix (sum_x (j), sum_y (i), color);
         }
     }
 
@@ -181,9 +184,9 @@ void draw ()
         for (x = 0; x < 3; x++)
         {
             if (arr[y][x] == 'x')
-                print_krest ();
+                print_krest (clWhite);
             else if (arr[y][x] == 'o')
-                print_krug ();
+                print_krug (clWhite);
         }
 
     oled_update ();
@@ -193,12 +196,27 @@ void move_cursor_x (uint8_t dir)
 {
     while (1)
     {
-	x = (x + dir) % 3;
+	x += dir;
+
+	if (x > 2)
+	{
+            y += 1;
+	    x = 0;
+
+	    if (y > 2)
+	        y = 0;
+	}	
+
+	if (x < 0)
+	{
+            x = 2;
+	    y -= 1;
+	    if (y < 0)
+		y = 2;
+	}
 
         if (arr[y][x] == '\0')
 	{
-            print_krug ();
-	    print_krest ();
 	    return;
 	}
     }
@@ -257,6 +275,22 @@ char check_win ()
     return '\0';
 }
 
+void put_curs ()
+{
+    for (uint8_t i = 0; i < 18; i++)
+	for (uint8_t j = 0; j < 18; j++)
+            oled_set_pix (sum_x (j), sum_y (i), clWhite);
+
+    if (player_turn)
+        print_krest (clBlack);
+    else
+	print_krug (clBlack);
+
+    oled_update ();
+
+    return;
+}
+
 int main(void)
 {
     rcc_config();
@@ -270,13 +304,17 @@ int main(void)
     int check = 0;
     char check_end = 0;
 
+    x = 0;
+    y = 0;
+
     while (1) 
     {
-	if (check == 0)    
-	    draw ();
+	draw ();
 
 	if (check == 0)
             find_empty ();
+
+        put_curs ();
 
         if (LL_TIM_GetCounterMode(TIM2) == LL_TIM_COUNTERMODE_UP) {
             LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_8);
@@ -290,6 +328,8 @@ int main(void)
 	    move_cursor_x (-1);
 	    check = 1;
         }
+
+	//if button pressed, then put 'x', or 'o' to the xurrent place, and change turn
 
 	check_end = check_win ();
 
