@@ -5,6 +5,11 @@
 #include "stm32f0xx_ll_tim.h"
 #include "xprintf.h"
 #include "oled_driver.h"
+#include "stm32f0xx_ll_exti.h"
+#include "stm32f0xx_ll_utils.h"
+#include "stm32f0xx_ll_cortex.h"
+
+
 
 #define x_max 3
 #define y_max 3
@@ -51,9 +56,8 @@ static void timers_config(void)
     LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_5, LL_GPIO_AF_2);
     LL_GPIO_SetPinPull(GPIOA, LL_GPIO_PIN_1, LL_GPIO_PULL_UP);
     LL_GPIO_SetPinPull(GPIOA, LL_GPIO_PIN_5, LL_GPIO_PULL_UP);
-    
-    LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM2);
 
+    LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM2);
     /* (1) Configure TI1FP1 on TI1 (CC1S = 01)
          configure TI1FP2 on TI2 (CC2S = 01) */
     /* (2) Configure TI1FP1 and TI2FP2 non inverted (CC1P = CC2P = 0, reset value) */
@@ -81,10 +85,9 @@ static void printf_config(void)
 
 char arr[y_max][x_max] = {'\0'};
 
-uint8_t x = 0;
-uint8_t y = 0;
-
-int player_turn = 0;
+int8_t x = 0;
+int8_t y = 0;
+uint8_t player_turn = 0;
 
 uint8_t sum_x (uint8_t j)
 {
@@ -95,6 +98,7 @@ uint8_t sum_y (uint8_t i)
 {
     return ((y + 1) * 2 + y * 16 + 2 + i);
 }
+
 
 
 void print_krest (enum color_t color)
@@ -234,6 +238,18 @@ void print_win (char winner)
     oled_update ();
 }
 
+void print_no_winner ()
+{
+    oled_clr (clBlack);
+    oled_set_cursor (0, 0);
+    xprintf ("         Draw!\n");
+    xprintf ("     If you want to\n");
+    xprintf ("    play again press\n");
+    xprintf ("         Reset.\n");
+    oled_update ();
+}
+
+
 char check_win ()
 {
     uint8_t j = 0;
@@ -291,6 +307,44 @@ void put_curs ()
     return;
 }
 
+
+
+int button_status, debouncer_clk = 0;
+int Button_Status()
+{ 
+    if (LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_0)) 
+    {
+        button_status = 1;
+        debouncer_clk = 0;
+    }
+    
+    if (button_status)
+    {
+        debouncer_clk++;
+    }
+    
+    if (debouncer_clk >= 5)
+    {
+        LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_8);
+        button_status = 0;
+        debouncer_clk = 0;
+    }    
+
+    return button_status;
+}
+
+int check_full ()
+{
+    for (uint8_t i = 0; i < 3; i++)
+        for (uint8_t j = 0; j < 3; j++)
+            {
+                if (arr[i][j] == '\0')
+                    return 0;
+            }
+   
+    return 1;
+}
+
 int main(void)
 {
     rcc_config();
@@ -306,40 +360,94 @@ int main(void)
 
     x = 0;
     y = 0;
-
+    int X,Y = 0;
+    int ch = 0;
+    int old_status,old_counter = 0;
+    int new_counter = 0;
+    old_counter = LL_TIM_GetCounter(TIM2);
+    
+    uint8_t x_save = 0;
+    uint8_t y_save = 0;
+    int check_no_winner = 0;
+    
     while (1) 
     {
 	draw ();
+	
+	x = x_save;
+	y = y_save;
 
 	if (check == 0)
-            find_empty ();
+            find_empty ();          
 
         put_curs ();
-
-        if (LL_TIM_GetCounterMode(TIM2) == LL_TIM_COUNTERMODE_UP) {
-            LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_8);
-            LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_9);
+ 
+        new_counter = LL_TIM_GetCounter(TIM2);
+ 
+        if (new_counter - old_counter >= 10)
+        {
 	    move_cursor_x (1);
 	    check = 1;
+	    old_counter = LL_TIM_GetCounter(TIM2);
         }
-	else if (LL_TIM_GetCounterMode(TIM2) == LL_TIM_COUNTERMODE_DOWN) {
-            LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_9);
-            LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_8);
+	else if (new_counter - old_counter <= -10) 
+	{
 	    move_cursor_x (-1);
 	    check = 1;
-        }
+	    old_counter = LL_TIM_GetCounter(TIM2);
+        }	
+        
+        /*oled_clr (clBlack);
+        oled_set_cursor (0, 0);
+        xprintf ("Ch = %d \n %d \n %d \n %d", ch, LL_TIM_GetCounter(TIM2), old_counter, LL_TIM_GetCounter(TIM2) - old_counter);
+        oled_update ();*/
 
-	//if button pressed, then put 'x', or 'o' to the xurrent place, and change turn
-
+	//if button pressed, then put 'x', or 'o' to the xurrent place, and change turn	
+	
+	if(Button_Status() == 0)
+	{
+	    X = x;
+	    Y = y;	    
+	}
+	
+	
+	if(old_status == 0 && Button_Status() == 1)
+	{    
+	    if(player_turn == 0)
+	    {
+	    arr[Y][X]   = 'o';
+	    player_turn = 1;
+	    }
+	    else if(player_turn == 1) 
+	    {
+	    arr[Y][X]   = 'x';
+	    player_turn = 0;
+	    }   
+	    
+	    check = 0;
+	}
+        
+        old_status = Button_Status();
+        
+        x_save = x;
+        y_save = y;
+	
 	check_end = check_win ();
 
 	if (check_end != '\0')
 	    break;
+	    
+        check_no_winner = check_full ();
+        if (check_no_winner != 0)
+            break;    
     }
 
     while (1)
     {
-        print_win (check_end);
+        if (check_end != '\0')
+            print_win (check_end);
+        if (check_no_winner != 0)
+            print_no_winner ();
     }
 
     return 0;
